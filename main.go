@@ -4,18 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 )
 
 type apiConfig struct {
 	fileServerHits int
-}
-
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		cfg.fileServerHits++
-		next.ServeHTTP(w, req)
-	})
 }
 
 func main() {
@@ -23,7 +15,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir(".")))))
-	mux.HandleFunc("/healthz", handleHealthz)
+	mux.HandleFunc("/healthz", handleReadiness)
 	mux.HandleFunc("/metrics", apiCfg.handleMetrics)
 	mux.HandleFunc("/reset", apiCfg.handleResetMetrics)
 
@@ -36,23 +28,15 @@ func main() {
 	log.Fatal(myServer.ListenAndServe())
 }
 
-func handleHealthz(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(http.StatusText(http.StatusOK)))
-}
-
 func (cfg *apiConfig) handleMetrics(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	hitsString := strconv.Itoa(cfg.fileServerHits)
-	w.Write([]byte("Hits: " + hitsString))
+	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileServerHits)))
 }
 
-func (cfg *apiConfig) handleResetMetrics(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	cfg.fileServerHits = 0
-	hitsString := strconv.Itoa(cfg.fileServerHits)
-	w.Write([]byte("Hits: " + hitsString))
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		cfg.fileServerHits++
+		next.ServeHTTP(w, req)
+	})
 }
