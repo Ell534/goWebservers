@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -39,18 +38,20 @@ func handleValidate(w http.ResponseWriter, req *http.Request) {
 
 	profanity := []string{"kerfuffle", "sharbert", "fornax"}
 
-	chirpText := chirp.Body
-	chirpTextSlice := strings.Split(chirpText, " ")
-	fmt.Printf("before checking for profanity: %v", chirpTextSlice)
-	for i, word := range chirpTextSlice {
-		if slices.Contains(profanity, strings.ToLower(word)) {
-			chirpTextSlice[i] = "****"
-		}
-	}
-	fmt.Printf("after checking for profanity: %v", chirpTextSlice)
-	cleanedChirp := strings.Join(chirpTextSlice, " ")
+	cleanedChirp := cleanChirpBody(chirp.Body, profanity)
 
 	respondWithJSON(w, http.StatusOK, validChirp{
 		CleanedBody: cleanedChirp,
 	})
+}
+
+func cleanChirpBody(chirp string, badWords []string) string {
+	chirpSlice := strings.Split(chirp, " ")
+	for i, word := range chirpSlice {
+		if slices.Contains(badWords, strings.ToLower(word)) {
+			chirpSlice[i] = "****"
+		}
+	}
+	cleanedChirp := strings.Join(chirpSlice, " ")
+	return cleanedChirp
 }
