@@ -6,8 +6,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/Ell534/goWebservers/internal/database"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -15,6 +17,13 @@ import (
 type apiConfig struct {
 	fileServerHits int
 	DB             *database.Queries
+}
+
+type User struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
 }
 
 func main() {
@@ -43,8 +52,10 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", handleReadiness)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handleMetrics)
 
-	mux.HandleFunc("GET /api/reset", apiCfg.handleResetMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handleResetMetrics)
 	mux.HandleFunc("POST /api/validate_chirp", handleValidate)
+
+	mux.HandleFunc("POST /api/users", handleCreateUser)
 
 	myServer := &http.Server{
 		Addr:    ":8080",
