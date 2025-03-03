@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/google/uuid"
 	"net/http"
 	"time"
+
+	"github.com/Ell534/goWebservers/internal/auth"
+	"github.com/Ell534/goWebservers/internal/database"
+	"github.com/google/uuid"
 )
 
 type User struct {
@@ -16,7 +19,8 @@ type User struct {
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
-		Email string `json:"email"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -24,10 +28,21 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	err := decoder.Decode(&newRequestBody)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "couldn't decode request body", err)
-		return
 	}
 
-	newUser, err := cfg.db.CreateUser(r.Context(), newRequestBody.Email)
+	hashedPass, err := auth.HashPassword(newRequestBody.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to hash password", err)
+	}
+
+	newUserParams := database.CreateUserParams{
+		Email:          newRequestBody.Email,
+		HashedPassword: hashedPass,
+	}
+	newUser, err := cfg.db.CreateUser(r.Context(), newUserParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to create new user", err)
+	}
 
 	response := User{
 		ID:        newUser.ID,
