@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/Ell534/goWebservers/internal/auth"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
@@ -15,11 +17,25 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	newRequestBody := requestBody{}
 	err := decoder.Decode(&newRequestBody)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "couldn't decode request body", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't decode request body", err)
 	}
-	// newRequestBody contains the email that will be used to query the database to retrieve the user
-	// once the user is retrieved, it will have their hashed password which will be used along with
-	// the password from the request body to plug into the checkpasswordhash function to determine if
-	// the correct password has been supplied.
-	// If the email or password are wrong just return 401 error, incorrect email/password.
+	queriedUser, err := cfg.db.GetUserByEmail(r.Context(), newRequestBody.Email)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "incorrect email or password", err)
+	}
+
+	err = auth.CheckPasswordHash(newRequestBody.Password, queriedUser.HashedPassword)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "incorrect email or password", err)
+		return
+	}
+
+	response := User{
+		ID:        queriedUser.ID,
+		CreatedAt: queriedUser.CreatedAt,
+		UpdatedAt: queriedUser.UpdatedAt,
+		Email:     queriedUser.Email,
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
 }
