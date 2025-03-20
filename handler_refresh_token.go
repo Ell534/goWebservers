@@ -1,55 +1,37 @@
 package main
 
 import (
-	"database/sql"
-	"errors"
 	"net/http"
 	"time"
 
 	"github.com/Ell534/goWebservers/internal/auth"
 )
 
-type refreshTokenResponse struct {
-	RefreshToken string `json:"token"`
-}
-
 func (cfg *apiConfig) handlerRefreshToken(w http.ResponseWriter, r *http.Request) {
+
+	type response struct {
+		Token string `json:"token"`
+	}
+
 	refreshToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "could not extract token from headers", err)
+		respondWithError(w, http.StatusBadRequest, "could not extract token from headers", err)
 		return
 	}
 
-	queriedToken, err := cfg.db.GetRefreshTokenByToken(r.Context(), refreshToken)
+	user, err := cfg.db.GetUserFromRefreshToken(r.Context(), refreshToken)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			respondWithError(w, http.StatusUnauthorized, "token not found in database", err)
-			return
-		}
-		respondWithError(w, http.StatusInternalServerError, "failed to retrieve token from database", err)
-		return
-	}
-	if queriedToken.ExpiresAt.Before(time.Now()) || queriedToken.RevokedAt.Valid {
-		respondWithError(w, http.StatusUnauthorized, "token is expired or has been revoked", err)
-		return
+		respondWithError(w, http.StatusUnauthorized, "Could not get user for refresh token", err)
 	}
 
-	userID, err := cfg.db.GetUserFromRefreshToken(r.Context(), queriedToken.Token)
+	newAccessToken, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "failed to retrieve user from token", err)
+		respondWithError(w, http.StatusUnauthorized, "could not validate token", err)
 		return
 	}
 
-	newAccessToken, err := auth.MakeJWT(userID, cfg.jwtSecret, time.Hour)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "could not create access token", err)
-		return
-	}
-
-	response := refreshTokenResponse{
-		RefreshToken: newAccessToken,
-	}
-
-	respondWithJSON(w, http.StatusOK, response)
+	respondWithJSON(w, http.StatusOK, response{
+		Token: newAccessToken,
+	})
 
 }

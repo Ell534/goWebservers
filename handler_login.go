@@ -15,13 +15,14 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 	}
 
-	const JWTExpiration = time.Hour * 1
-	refreshTokenExpiration := time.Now().AddDate(0, 0, 60)
+	type response struct {
+		User
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
+	}
 
 	decoder := json.NewDecoder(r.Body)
-
 	newRequestBody := requestBody{}
-
 	err := decoder.Decode(&newRequestBody)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "couldn't decode request body", err)
@@ -40,7 +41,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	usersToken, err := auth.MakeJWT(queriedUser.ID, cfg.jwtSecret, time.Duration(JWTExpiration))
+	usersToken, err := auth.MakeJWT(queriedUser.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not create JWT", err)
 		return
@@ -55,19 +56,22 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	newRefreshTokenParams := database.CreateRefreshTokenParams{
 		Token:     refreshToken,
 		UserID:    queriedUser.ID,
-		ExpiresAt: refreshTokenExpiration,
+		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 60),
 	}
 
-	newRefreshToken, err := cfg.db.CreateRefreshToken(r.Context(), newRefreshTokenParams)
+	_, err = cfg.db.CreateRefreshToken(r.Context(), newRefreshTokenParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not save the refresh token", err)
+	}
 
-	response := User{
-		ID:           queriedUser.ID,
-		CreatedAt:    queriedUser.CreatedAt,
-		UpdatedAt:    queriedUser.UpdatedAt,
-		Email:        queriedUser.Email,
+	respondWithJSON(w, http.StatusOK, response{
+		User: User{
+			ID:        queriedUser.ID,
+			CreatedAt: queriedUser.CreatedAt,
+			UpdatedAt: queriedUser.UpdatedAt,
+			Email:     queriedUser.Email,
+		},
 		Token:        usersToken,
-		RefreshToken: newRefreshToken.Token,
-	}
-
-	respondWithJSON(w, http.StatusOK, response)
+		RefreshToken: refreshToken,
+	})
 }
