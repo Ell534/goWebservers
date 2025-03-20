@@ -25,6 +25,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&newRequestBody)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "couldn't decode request body", err)
+		return
 	}
 
 	queriedUser, err := cfg.db.GetUserByEmail(r.Context(), newRequestBody.Email)
@@ -48,6 +49,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	refreshToken, err := auth.MakeRefreshToken()
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not create refresh token", err)
+		return
 	}
 
 	newRefreshTokenParams := database.CreateRefreshTokenParams{
