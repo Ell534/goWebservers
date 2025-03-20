@@ -6,17 +6,17 @@ import (
 	"time"
 
 	"github.com/Ell534/goWebservers/internal/auth"
+	"github.com/Ell534/goWebservers/internal/database"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type requestBody struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds *int   `json:"expires_in_seconds,omitempty"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
-	const oneHourInSeconds = 3600
-	var expiresIn int
+	const JWTExpiration = time.Hour * 1
+	refreshTokenExpiration := time.Now().AddDate(0, 0, 60)
 
 	decoder := json.NewDecoder(r.Body)
 
@@ -25,16 +25,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&newRequestBody)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "couldn't decode request body", err)
-	}
-
-	if newRequestBody.ExpiresInSeconds == nil {
-		expiresIn = oneHourInSeconds
-	} else {
-		if *newRequestBody.ExpiresInSeconds > oneHourInSeconds {
-			expiresIn = oneHourInSeconds
-		} else {
-			expiresIn = oneHourInSeconds
-		}
 	}
 
 	queriedUser, err := cfg.db.GetUserByEmail(r.Context(), newRequestBody.Email)
@@ -49,18 +39,32 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	usersToken, err := auth.MakeJWT(queriedUser.ID, cfg.jwtSecret, time.Duration(expiresIn)*time.Second)
+	usersToken, err := auth.MakeJWT(queriedUser.ID, cfg.jwtSecret, time.Duration(JWTExpiration))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not create JWT", err)
 		return
 	}
 
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not create refresh token", err)
+	}
+
+	newRefreshTokenParams := database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    queriedUser.ID,
+		ExpiresAt: refreshTokenExpiration,
+	}
+
+	newRefreshToken, err := cfg.db.CreateRefreshToken(r.Context(), newRefreshTokenParams)
+
 	response := User{
-		ID:        queriedUser.ID,
-		CreatedAt: queriedUser.CreatedAt,
-		UpdatedAt: queriedUser.UpdatedAt,
-		Email:     queriedUser.Email,
-		Token:     usersToken,
+		ID:           queriedUser.ID,
+		CreatedAt:    queriedUser.CreatedAt,
+		UpdatedAt:    queriedUser.UpdatedAt,
+		Email:        queriedUser.Email,
+		Token:        usersToken,
+		RefreshToken: newRefreshToken.Token,
 	}
 
 	respondWithJSON(w, http.StatusOK, response)
