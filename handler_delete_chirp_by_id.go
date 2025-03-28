@@ -19,7 +19,6 @@ func (cfg *apiConfig) handlerDeleteChirpByID(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// get bearer token and retrieve userID from token
 	accessToken, err := auth.GetBearerToken(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "no access token in header found", err)
@@ -32,27 +31,22 @@ func (cfg *apiConfig) handlerDeleteChirpByID(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// retrive the chirp from the database using the provided chirpID
-	// if the chirp is not found then return 404
 	chirp, err := cfg.db.GetChirpById(r.Context(), chirpID)
 	if err != nil {
 		respondWithError(w, http.StatusNotFound, "chirp with provided chirpID not found in database", err)
 		return
 	}
 
-	// if tokenUserID and chirpUserID do not match, return 403
 	if userID != chirp.UserID {
 		respondWithError(w, http.StatusForbidden, "userID in bearer token does not match userID of chirp to delete", err)
 		return
 	}
 
-	// if userIDs match then delete the chirp, need to write query
 	err = cfg.db.DeleteChirpByID(r.Context(), chirp.ID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "failed to delete chirp", err)
 		return
 	}
 
-	// if deletion successful then return a 204
 	w.WriteHeader(http.StatusNoContent)
 }
