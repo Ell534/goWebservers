@@ -5,8 +5,8 @@ import (
 	"net/http"
 )
 
-func (cfg *apiConfig) handlerGetChirpById(w http.ResponseWriter, r *http.Request) {
-	chirpIdStr := r.PathValue("chirpId")
+func (cfg *apiConfig) handlerGetChirpByID(w http.ResponseWriter, r *http.Request) {
+	chirpIdStr := r.PathValue("chirpID")
 
 	if chirpIdStr == "" {
 		respondWithError(w, http.StatusBadRequest, "Chirp ID not found in path", nil)
