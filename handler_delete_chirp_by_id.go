@@ -47,5 +47,12 @@ func (cfg *apiConfig) handlerDeleteChirpByID(w http.ResponseWriter, r *http.Requ
 	}
 
 	// if userIDs match then delete the chirp, need to write query
+	err = cfg.db.DeleteChirpByID(r.Context(), chirp.ID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "failed to delete chirp", err)
+		return
+	}
+
 	// if deletion successful then return a 204
+	w.WriteHeader(http.StatusNoContent)
 }
