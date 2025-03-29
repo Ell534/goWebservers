@@ -17,12 +17,17 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	jwtSecret      string
+	polkaAPIKey    string
 }
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("error loading .env file: %s", err)
+	}
+	polkaAPIKey := os.Getenv("POLKA_KEY")
+	if polkaAPIKey == "" {
+		log.Fatal("POLKA_KEY must be set")
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -50,6 +55,7 @@ func main() {
 		db:             dbQueries,
 		platform:       os.Getenv("PLATFORM"),
 		jwtSecret:      os.Getenv("JWT_SECRET"),
+		polkaAPIKey:    os.Getenv("POLKA_KEY"),
 	}
 
 	mux := http.NewServeMux()
