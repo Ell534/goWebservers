@@ -2,12 +2,17 @@ package main
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
 	authorIDStr := r.URL.Query().Get("author_id")
+	sortStr := r.URL.Query().Get("sort")
+	if sortStr == "" {
+		sortStr = "asc"
+	}
 
 	if authorIDStr != "" {
 		userID, err := uuid.Parse(authorIDStr)
@@ -32,8 +37,12 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 				UserID:    chirp.UserID,
 			})
 		}
-
-		respondWithJSON(w, http.StatusOK, userChirps)
+		if sortStr == "desc" {
+			sort.Slice(userChirps, func(i, j int) bool { return userChirps[i].CreatedAt.After(userChirps[j].CreatedAt) })
+			respondWithJSON(w, http.StatusOK, userChirps)
+		} else {
+			respondWithJSON(w, http.StatusOK, userChirps)
+		}
 	} else {
 
 		allChirps, err := cfg.db.GetAllChirps(r.Context())
@@ -52,8 +61,11 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 				UserID:    chirp.UserID,
 			})
 		}
-
-		respondWithJSON(w, http.StatusOK, chirps)
-
+		if sortStr == "desc" {
+			sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
+			respondWithJSON(w, http.StatusOK, chirps)
+		} else {
+			respondWithJSON(w, http.StatusOK, chirps)
+		}
 	}
 }
